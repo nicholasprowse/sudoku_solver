@@ -53,7 +53,7 @@ def print_sudoku(sudoku):
 
 def error(message):
     """Prints the given message to standard error and exits execution"""
-    sys.stderr.write(message)
+    sys.stderr.write(message + '\n')
     raise SystemExit
 
 
@@ -64,27 +64,68 @@ def parse_input(args):
     9 rows across the list of strings. If these conditions aren't met, an error is displayed to the user. Numerical
     values are directly converted to ints, while underscores are converted to zeros (indicating the absence of a value)
 
-    TODO Handle invalid characters
     :param args: list of comma separated rows
     :return: 9x9 numpy array representing the sudoku, where absent values are represented by 0
     """
     args = [i.split(",") for i in args]
     num_rows = sum([len(i) for i in args])
     if num_rows != 9:
-        error(f"Input Error: Sudoku must contain 9 rows, but {num_rows} have been given\n")
+        error(f"Input Error: Sudoku must contain 9 rows, but {num_rows} have been given")
     sudoku = np.uint8(np.zeros((9, 9)))
     row = 0
     for i in args:
         for j in i:
             if len(j) != 9:
-                error(f"Input Error: Every row must have 9 characters, but row {row + 1} has {len(j)} characters\n")
+                error(f"Input Error: Every row must have 9 characters, but row {row + 1} has {len(j)} characters")
             for col in range(9):
                 c = j[col]
                 if c == '_':
                     c = '0'
-                sudoku[col, row] = int(c)
+                try:
+                    sudoku[col, row] = int(c)
+                except ValueError:
+                    error(f"Input Error: The character '{c}' on row {row+1}, column {col+1} is invalid. Only the "
+                          f"numeric digits, 0 to 9, and underscores are allowed")
             row += 1
 
+    return sudoku
+
+
+def brute_force_solve(sudoku):
+    """
+    Brute force approach to solving the sudoku. This works by finding the first unknown value, and checking the row,
+    column and box to determine which values can go there. Each value is then tried, and the function is recursively
+    called with the new sudoku. This can solve easy sudoku's, but is very slow for harder sudoku's
+    :param sudoku: 3x3 numpy array containing the sudoku to be solved
+    :return: 3x3 numpy array containing the solved sudoku
+    """
+    for y in range(9):
+        for x in range(9):
+            if sudoku[x, y] == 0:
+                potential_values = [True] * 9
+
+                for i in range(9):
+                    # Check row
+                    if sudoku[i, y] != 0:
+                        potential_values[sudoku[i, y]-1] = False
+                    # Check col
+                    if sudoku[x, i] != 0:
+                        potential_values[sudoku[x, i]-1] = False
+                    # Check box
+                    val = sudoku[3 * (x // 3) + i // 3, 3 * (y // 3) + i % 3]
+                    if val != 0:
+                        potential_values[val-1] = False
+
+                for i in range(9):
+                    if potential_values[i]:
+                        sudoku[x, y] = i + 1
+                        solution = brute_force_solve(sudoku)
+                        if solution is not None:
+                            return solution
+                        sudoku[x, y] = 0
+
+                return None
+    # If you get to the end, there are no zeros, so it's already solved
     return sudoku
 
 
@@ -109,6 +150,11 @@ def main():
         sudoku = parse_input(args.sudoku)
 
     print_sudoku(sudoku)
+    solution = brute_force_solve(sudoku)
+    if solution is None:
+        print('This sudoku has no solutions')
+    else:
+        print_sudoku(solution)
 
 
 if __name__ == '__main__':
